@@ -1,3 +1,5 @@
+import './index.css';
+
 interface OnlineClass {
 	subjNm: string;
 	subj: string;
