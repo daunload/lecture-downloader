@@ -1,0 +1,65 @@
+name: Build Electron App
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+jobs:
+    release:
+        runs-on: ${{ matrix.os }}
+
+        strategy:
+            matrix:
+                os: [windows-latest, macos-latest]
+
+        permissions:
+            contents: write
+
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0 # 태그 정보 포함
+
+            - name: Install Node.js, NPM and Yarn
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 22.14.0
+
+            - name: Check Node.js version
+              run: node -v #
+
+            - name: Install dependencies using npm ci
+              run: npm ci # npm ci 명령어 실행
+
+            - name: Build/release Electron app (macOS)
+              if: matrix.os == 'macos-latest'
+              run: npm run dist:mac
+              timeout-minutes: 10
+
+            - name: Build/release Electron app (Windows)
+              if: matrix.os == 'windows-latest'
+              run: |
+                  # PowerShell 5.x가 기본적으로 설치되어 있을 수 있지만, 명시적으로 실행
+                  $PSVersionTable.PSVersion
+                  powershell -Version 5 -Command "npm run dist:mac"
+                  Compress-Archive -Path dist\win-unpacked\* -DestinationPath dist\win-unpacked.zip
+              continue-on-error: true
+              timeout-minutes: 10
+
+            - name: Debug build output
+              run: ls -R dist/
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  files: |
+                      dist/*.dmg
+                      dist/*.exe
+                      dist/*.zip
+                  body: '🚀 새로운 버전 빌드'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              continue-on-error: true
