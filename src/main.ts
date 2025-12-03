@@ -1,7 +1,16 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
+import { updateElectronApp, UpdateSourceType } from 'update-electron-app';
 import BridgeHandler from './bridge';
+
+updateElectronApp({
+	updateSource: {
+		type: UpdateSourceType.ElectronPublicUpdateService,
+		repo: 'seodaun/lecture-downloader',
+	},
+	updateInterval: '1 hour',
+});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
