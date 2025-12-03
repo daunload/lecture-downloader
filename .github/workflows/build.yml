@@ -43,7 +43,7 @@ jobs:
               run: |
                   # PowerShell 5.x가 기본적으로 설치되어 있을 수 있지만, 명시적으로 실행
                   $PSVersionTable.PSVersion
-                  powershell -Version 5 -Command "npm run dist:mac"
+                  powershell -Version 5 -Command "npm run dist:win"
                   Compress-Archive -Path dist\win-unpacked\* -DestinationPath dist\win-unpacked.zip
               continue-on-error: true
               timeout-minutes: 10
