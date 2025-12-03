@@ -6,6 +6,9 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const config: ForgeConfig = {
 	packagerConfig: {
@@ -58,7 +61,7 @@ const config: ForgeConfig = {
 		{
 			name: '@electron-forge/publisher-github',
 			config: {
-				authToken: process.env.GH_PAT,
+				authToken: process.env.GITHUB_TOKEN,
 				repository: {
 					owner: 'daunload',
 					name: 'lecture-downloader',
