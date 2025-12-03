@@ -61,5 +61,5 @@ jobs:
                       dist/*.zip
                   body: '🚀 새로운 버전 빌드'
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GH_PAT }}
               continue-on-error: true
