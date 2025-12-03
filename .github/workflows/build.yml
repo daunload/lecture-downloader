@@ -36,6 +36,8 @@ jobs:
             - name: Build/release Electron app (macOS)
               if: matrix.os == 'macos-latest'
               run: npm run dist:mac
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               timeout-minutes: 10
 
             - name: Build/release Electron app (Windows)
@@ -45,6 +47,8 @@ jobs:
                   $PSVersionTable.PSVersion
                   powershell -Version 5 -Command "npm run dist:win"
                   Compress-Archive -Path dist\win-unpacked\* -DestinationPath dist\win-unpacked.zip
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               continue-on-error: true
               timeout-minutes: 10
 
