@@ -147,7 +147,6 @@ const handleClassClick = async (
 			pw,
 			subjectName,
 		);
-		console.log('Class contents:', contents);
 
 		if (contents.length === 0) {
 			showMessage(

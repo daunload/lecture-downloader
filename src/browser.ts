@@ -314,9 +314,15 @@ export const getClassContents = async (
 		'Y',
 	);
 
-	const videoIdList = onlineContents.map((content) =>
-		content.starting.split('/').pop(),
-	);
+	const videoIdList = onlineContents
+		.map((content) => {
+			const url = content.starting;
+
+			if (!url) return null;
+			const id = url.split('/').pop();
+			return id;
+		})
+		.filter((id) => id !== null);
 
 	const videoUrlList = videoIdList.map(
 		(id) =>
