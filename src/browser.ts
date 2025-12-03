@@ -1,8 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline';
-import { pipeline } from 'node:stream/promises';
 import puppeteer, { Page } from 'puppeteer';
 
 /** 로그인 */
@@ -68,47 +66,139 @@ const downloadVideo = async (
 	videoUrl: string,
 	index: number,
 	downloadDir: string,
+	signal?: AbortSignal,
+	onProgress?: (percent: number) => void,
 ) => {
 	const fileName = `video_${index + 1}.mp4`;
 	const outputPath = path.join(downloadDir, fileName);
 	try {
-		const response = await fetch(videoUrl);
+		const response = await fetch(videoUrl, { signal });
 		if (!response.ok) throw new Error(`서버 응답 오류 ${response.status}`);
-		await pipeline(response.body, fs.createWriteStream(outputPath));
+
+		const totalLength = response.headers.get('content-length');
+		const totalBytes = totalLength ? parseInt(totalLength, 10) : 0;
+		let downloadedBytes = 0;
+
+		if (response.body) {
+			const reader = response.body.getReader();
+			const writer = fs.createWriteStream(outputPath);
+
+			const stream = new ReadableStream({
+				async start(controller) {
+					let result = await reader.read();
+					while (!result.done) {
+						const { value } = result;
+						downloadedBytes += value.byteLength;
+						if (totalBytes > 0 && onProgress) {
+							const percent =
+								(downloadedBytes / totalBytes) * 100;
+							onProgress(percent);
+						}
+						controller.enqueue(value);
+						writer.write(Buffer.from(value));
+						result = await reader.read();
+					}
+					controller.close();
+					writer.end();
+				},
+				cancel() {
+					reader.cancel();
+					writer.end();
+				},
+			});
+
+			// Wait for the stream to finish
+			await new Promise((resolve, reject) => {
+				const writable = new WritableStream({
+					write() {
+						// We already wrote to file in the readable stream loop
+					},
+					close() {
+						resolve(true);
+					},
+					abort(err) {
+						reject(err);
+					},
+				});
+				stream.pipeTo(writable).catch(reject);
+
+				if (signal) {
+					signal.addEventListener('abort', () => {
+						reject(new Error('Aborted'));
+					});
+				}
+			});
+		}
+
 		console.log(`[다운로드 완료] ${fileName}`);
 		return { success: true, path: outputPath, file: fileName };
 	} catch (error) {
-		console.error(`[다운로드 오류] ${fileName}:`, error.message);
+		if (
+			error.name === 'AbortError' ||
+			(error instanceof Error && error.message === 'Aborted')
+		) {
+			console.log(`[다운로드 취소] ${fileName}`);
+		} else {
+			console.error(`[다운로드 오류] ${fileName}:`, error.message);
+		}
 		return { success: false, file: fileName };
 	}
 };
 
 // 2단계: MP3 변환 함수
-const convertToMp3 = (filePath: string, convertedDir: string) => {
+const convertToMp3 = (
+	filePath: string,
+	convertedDir: string,
+	signal?: AbortSignal,
+	onProgress?: (percent: number) => void,
+) => {
 	return new Promise((resolve, reject) => {
+		if (signal?.aborted) {
+			return reject(new Error('Aborted'));
+		}
+
 		const inputFileName = path.basename(filePath);
 		const outputFileName = `${path.parse(inputFileName).name}.mp3`;
 		const outputPath = path.join(convertedDir, outputFileName);
 
 		console.log(`[변환 시작] ${inputFileName} -> ${outputFileName}`);
 
-		ffmpeg(filePath)
+		const command = ffmpeg(filePath)
 			.toFormat('mp3')
+			.on('progress', (progress) => {
+				if (onProgress) {
+					onProgress(progress.percent);
+				}
+			})
 			.on('end', () => {
 				console.log(`[변환 완료] ${outputFileName}`);
 				resolve({ success: true, file: outputFileName });
 			})
 			.on('error', (err) => {
-				console.error(`[변환 오류] ${inputFileName}:`, err.message);
-				reject(err);
-			})
-			.save(outputPath);
+				if (err.message.includes('SIGKILL')) {
+					console.log(`[변환 취소] ${inputFileName}`);
+					reject(new Error('Aborted'));
+				} else {
+					console.error(`[변환 오류] ${inputFileName}:`, err.message);
+					reject(err);
+				}
+			});
+
+		if (signal) {
+			signal.addEventListener('abort', () => {
+				command.kill('SIGKILL');
+			});
+		}
+
+		command.save(outputPath);
 	});
 };
 
 export const downloadVideos = async (
 	videoUrlList: string[],
 	baseDir: string,
+	onProgress?: (status: string, progress: number) => void,
+	signal?: AbortSignal,
 ) => {
 	const downloadsDir = path.join(baseDir, 'downloads');
 	const convertedDir = path.join(baseDir, 'converted_mp3s');
@@ -117,10 +207,33 @@ export const downloadVideos = async (
 	if (!fs.existsSync(downloadsDir))
 		fs.mkdirSync(downloadsDir, { recursive: true });
 
-	const downloadPromises = videoUrlList.map((url, index) =>
-		downloadVideo(url, index, downloadsDir),
-	);
-	const downloadResults = await Promise.all(downloadPromises);
+	const downloadResults = [];
+	for (let i = 0; i < videoUrlList.length; i++) {
+		if (signal?.aborted) break;
+		const url = videoUrlList[i];
+		if (onProgress) {
+			onProgress(
+				`동영상 다운로드 중 (${i + 1}/${videoUrlList.length})`,
+				0,
+			);
+		}
+		const result = await downloadVideo(
+			url,
+			i,
+			downloadsDir,
+			signal,
+			(percent) => {
+				if (onProgress) {
+					onProgress(
+						`동영상 다운로드 중 (${i + 1}/${videoUrlList.length})`,
+						percent,
+					);
+				}
+			},
+		);
+		downloadResults.push(result);
+	}
+
 	const successfulDownloads = downloadResults.filter((res) => res.success);
 
 	console.log(
@@ -138,8 +251,32 @@ export const downloadVideos = async (
 		fs.mkdirSync(convertedDir, { recursive: true });
 
 	// 변환은 서버에 부하를 줄 수 있으므로 순차적으로 진행
-	for (const download of successfulDownloads) {
-		await convertToMp3(download.path, convertedDir);
+	for (let i = 0; i < successfulDownloads.length; i++) {
+		if (signal?.aborted) break;
+		const download = successfulDownloads[i];
+		if (onProgress) {
+			onProgress(
+				`MP3 변환 중 (${i + 1}/${successfulDownloads.length})`,
+				0,
+			);
+		}
+		try {
+			await convertToMp3(
+				download.path,
+				convertedDir,
+				signal,
+				(percent) => {
+					if (onProgress) {
+						onProgress(
+							`MP3 변환 중 (${i + 1}/${successfulDownloads.length})`,
+							percent,
+						);
+					}
+				},
+			);
+		} catch (e) {
+			if (signal?.aborted) break;
+		}
 	}
 
 	console.log('\n모든 작업이 완료되었습니다.');
@@ -188,41 +325,3 @@ export const getClassContents = async (
 
 	return videoUrlList;
 };
-
-// (async () => {
-// 	const browser = await puppeteer.launch({ headless: true });
-// 	const page = await browser.newPage();
-
-// 	try {
-// 		await loginAndNavigate(page);
-// 		const yearHakgi = await searchYearHakgi(page);
-// 		const atnlcSbjectList = yearHakgi.atnlcSbjectList;
-
-// 		const subjects = atnlcSbjectList.map((sbj) => sbj.subjNm);
-// 		const selectedOption = await selectOption(subjects);
-
-// 		const selectedSubj = atnlcSbjectList.find(
-// 			(sbj) => sbj.subjNm === selectedOption,
-// 		);
-
-// 		const onlineContents = await onlineContentList(
-// 			page,
-// 			selectedSubj.subj,
-// 			selectedSubj.yearhakgi,
-// 			'Y',
-// 		);
-
-// 		const videoIdList = onlineContents.map((content) =>
-// 			content.starting.split('/').pop(),
-// 		);
-
-// 		const videoUrlList = videoIdList.map(
-// 			(id) =>
-// 				`https://kwcommons.kw.ac.kr/contents5/KW10000001/${id}/contents/media_files/screen.mp4`,
-// 		);
-// 		await runMacro(videoUrlList);
-// 	} finally {
-// 		await browser.close();
-// 		process.exit();
-// 	}
-// })();

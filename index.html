@@ -19,6 +19,40 @@
 				>선택된 폴더 없음</span
 			>
 		</div>
+		<div
+			id="progress-container"
+			style="
+				display: none;
+				margin-top: 10px;
+				padding: 10px;
+				border: 1px solid #ddd;
+				background-color: #f9f9f9;
+			"
+		>
+			<div style="margin-bottom: 5px">
+				<span id="progress-status">준비 중...</span>
+				<span id="progress-percent" style="float: right">0%</span>
+			</div>
+			<progress
+				id="download-progress"
+				value="0"
+				max="100"
+				style="width: 100%"
+			></progress>
+			<button
+				id="stop-btn"
+				style="
+					margin-top: 10px;
+					background-color: #ff4444;
+					color: white;
+					border: none;
+					padding: 5px 10px;
+					cursor: pointer;
+				"
+			>
+				중지
+			</button>
+		</div>
 		<div id="class-list-container"></div>
 		<script type="module" src="/src/renderer.ts"></script>
 	</body>

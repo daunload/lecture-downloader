@@ -21,6 +21,10 @@ declare global {
 				videoUrls: string[],
 				downloadDir: string,
 			) => Promise<void>;
+			onDownloadProgress: (
+				callback: (status: string, progress: number) => void,
+			) => void;
+			cancelDownload: () => Promise<void>;
 		};
 	}
 }
@@ -38,6 +42,19 @@ const elements = {
 	selectedDirPath: document.getElementById(
 		'selected-dir-path',
 	) as HTMLSpanElement,
+	progressContainer: document.getElementById(
+		'progress-container',
+	) as HTMLDivElement,
+	progressStatus: document.getElementById(
+		'progress-status',
+	) as HTMLSpanElement,
+	progressPercent: document.getElementById(
+		'progress-percent',
+	) as HTMLSpanElement,
+	downloadProgress: document.getElementById(
+		'download-progress',
+	) as HTMLProgressElement,
+	stopBtn: document.getElementById('stop-btn') as HTMLButtonElement,
 } as const;
 
 let selectedDownloadDir: string | null = null;
@@ -84,6 +101,23 @@ const handleSelectDir = async () => {
 	}
 };
 
+const updateProgress = (status: string, progress: number) => {
+	elements.progressStatus.textContent = status;
+	elements.progressPercent.textContent = `${Math.round(progress)}%`;
+	elements.downloadProgress.value = progress;
+};
+
+const handleStop = async () => {
+	await window.bridge.cancelDownload();
+	elements.progressStatus.textContent = '취소 중...';
+	elements.stopBtn.disabled = true;
+};
+
+// 진행률 리스너 등록
+window.bridge.onDownloadProgress((status: string, progress: number) => {
+	updateProgress(status, progress);
+});
+
 const handleClassClick = async (
 	subjectName: string,
 	id: string,
@@ -122,11 +156,11 @@ const handleClassClick = async (
 			return;
 		}
 
-		showMessage(
-			elements.classListContainer,
-			`${contents.length}개의 강의를 다운로드 및 변환 중... (시간이 걸릴 수 있습니다)`,
-			'info',
-		);
+		// UI 초기화 및 표시
+		elements.progressContainer.style.display = 'block';
+		elements.stopBtn.disabled = false;
+		updateProgress('다운로드 준비 중...', 0);
+		showMessage(elements.classListContainer, '', 'info'); // 메시지 클리어
 
 		await window.bridge.downloadVideos(contents, selectedDownloadDir);
 
@@ -142,11 +176,25 @@ const handleClassClick = async (
 			'Failed to get class contents or download:',
 			errorMessage,
 		);
-		showMessage(
-			elements.classListContainer,
-			`오류 발생: ${errorMessage}`,
-			'error',
-		);
+
+		if (
+			errorMessage.includes('cancelled') ||
+			errorMessage.includes('Aborted')
+		) {
+			showMessage(
+				elements.classListContainer,
+				'작업이 취소되었습니다.',
+				'info',
+			);
+		} else {
+			showMessage(
+				elements.classListContainer,
+				`오류 발생: ${errorMessage}`,
+				'error',
+			);
+		}
+	} finally {
+		elements.progressContainer.style.display = 'none';
 	}
 };
 
@@ -238,3 +286,4 @@ const handleLogin = async () => {
 // 이벤트 리스너 등록
 elements.loginBtn.addEventListener('click', handleLogin);
 elements.selectDirBtn.addEventListener('click', handleSelectDir);
+elements.stopBtn.addEventListener('click', handleStop);

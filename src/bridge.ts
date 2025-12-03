@@ -6,6 +6,8 @@ import {
 } from './browser';
 
 export default class BridgeHandler {
+	private abortController: AbortController | null = null;
+
 	constructor(
 		private mainWindow: BrowserWindow,
 		private ipcMain: IpcMain,
@@ -40,8 +42,37 @@ export default class BridgeHandler {
 
 		this.ipcMain.handle(
 			'download-videos',
-			(_, videoUrls: string[], downloadDir: string) =>
-				downloadVideos(videoUrls, downloadDir),
+			async (_, videoUrls: string[], downloadDir: string) => {
+				this.abortController = new AbortController();
+				try {
+					await downloadVideos(
+						videoUrls,
+						downloadDir,
+						(status, progress) => {
+							this.mainWindow.webContents.send(
+								'download-progress',
+								status,
+								progress,
+							);
+						},
+						this.abortController.signal,
+					);
+				} catch (error) {
+					if (this.abortController.signal.aborted) {
+						console.log('Download cancelled');
+					} else {
+						throw error;
+					}
+				} finally {
+					this.abortController = null;
+				}
+			},
 		);
+
+		this.ipcMain.handle('cancel-download', () => {
+			if (this.abortController) {
+				this.abortController.abort();
+			}
+		});
 	}
 }

@@ -11,4 +11,13 @@ contextBridge.exposeInMainWorld('bridge', {
 	selectDownloadDir: () => ipcRenderer.invoke('select-download-dir'),
 	downloadVideos: (videoUrls: string[], downloadDir: string) =>
 		ipcRenderer.invoke('download-videos', videoUrls, downloadDir),
+	onDownloadProgress: (
+		callback: (status: string, progress: number) => void,
+	) =>
+		ipcRenderer.on(
+			'download-progress',
+			(_event, status: string, progress: number) =>
+				callback(status, progress),
+		),
+	cancelDownload: () => ipcRenderer.invoke('cancel-download'),
 });
