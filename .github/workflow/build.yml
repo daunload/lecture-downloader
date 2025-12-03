@@ -1,0 +1,42 @@
+name: Build Electron App
+
+on: push
+
+jobs:
+    release:
+        runs-on: ${{ matrix.os }}
+
+        strategy:
+            matrix:
+                os: [windows-latest, macos-latest]
+
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v1
+
+            - name: Install Node.js, NPM and Yarn
+              uses: actions/setup-node@v1
+              with:
+                  node-version: 22
+
+            - name: Build/release Electron app
+              uses: samuelmeuli/action-electron-builder@v1
+              with:
+                  # GitHub token, automatically provided to the action
+                  # (No need to define this secret in the repo settings)
+                  github_token: ${{ secrets.GH_PAT }}
+
+                  # If the commit is tagged with a version (e.g. "v1.0.0"),
+                  # release the app after building
+                  release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  files: |
+                      dist/*.dmg
+                      dist/*.exe
+                  body: '🚀 Electron 앱 새 버전 등장'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GH_PAT }}
