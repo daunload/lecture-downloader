@@ -10,7 +10,10 @@
 		"make": "electron-forge make",
 		"publish": "electron-forge publish",
 		"lint": "eslint --ext .ts,.tsx .",
-		"format": "npx prettier --write ."
+		"format": "npx prettier --write .",
+		"dist": "npm run package && electron-builder",
+		"dist:mac": "npm run package && electron-builder --mac",
+		"dist:win": "npm run package && electron-builder --win"
 	},
 	"keywords": [],
 	"author": {
@@ -33,6 +36,7 @@
 		"@typescript-eslint/eslint-plugin": "^5.62.0",
 		"@typescript-eslint/parser": "^5.62.0",
 		"electron": "39.2.4",
+		"electron-builder": "^26.0.12",
 		"eslint": "^8.57.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-import": "^2.32.0",
