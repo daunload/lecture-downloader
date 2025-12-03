@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+	</head>
+	<body>
+		<div>
+			<label for="username">ID:</label>
+			<input type="text" id="username" placeholder="Enter ID" />
+		</div>
+		<div>
+			<label for="password">Password:</label>
+			<input type="password" id="password" placeholder="Enter Password" />
+		</div>
+		<button id="login-btn">시작</button>
+		<div style="margin-top: 10px">
+			<button id="select-dir-btn">다운로드 폴더 선택</button>
+			<span id="selected-dir-path" style="margin-left: 10px; color: #666"
+				>선택된 폴더 없음</span
+			>
+		</div>
+		<div id="class-list-container"></div>
+		<script type="module" src="/src/renderer.ts"></script>
+	</body>
+</html>
