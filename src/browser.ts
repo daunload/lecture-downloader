@@ -194,6 +194,31 @@ const convertToMp3 = (
 	});
 };
 
+// 동시 실행 개수를 제한하는 헬퍼 함수
+const limitConcurrency = async <T>(
+	tasks: (() => Promise<T>)[],
+	limit: number,
+) => {
+	const results: T[] = [];
+	const executing: Promise<void>[] = [];
+
+	for (const task of tasks) {
+		const promise = task().then((result) => {
+			results.push(result);
+			executing.splice(executing.indexOf(promise), 1);
+		});
+
+		executing.push(promise);
+
+		if (executing.length >= limit) {
+			await Promise.race(executing);
+		}
+	}
+
+	await Promise.all(executing);
+	return results;
+};
+
 export const downloadVideos = async (
 	videoUrlList: string[],
 	baseDir: string,
@@ -203,38 +228,86 @@ export const downloadVideos = async (
 	const downloadsDir = path.join(baseDir, 'downloads');
 	const convertedDir = path.join(baseDir, 'converted_mp3s');
 
-	console.log('--- 1단계: 동영상 다운로드 시작 ---');
+	console.log('--- 1단계: 동영상 다운로드 시작 (병렬 처리) ---');
 	if (!fs.existsSync(downloadsDir))
 		fs.mkdirSync(downloadsDir, { recursive: true });
 
-	const downloadResults = [];
-	for (let i = 0; i < videoUrlList.length; i++) {
-		if (signal?.aborted) break;
-		const url = videoUrlList[i];
-		if (onProgress) {
-			onProgress(
-				`동영상 다운로드 중 (${i + 1}/${videoUrlList.length})`,
-				0,
-			);
-		}
-		const result = await downloadVideo(
-			url,
-			i,
-			downloadsDir,
-			signal,
-			(percent) => {
-				if (onProgress) {
-					onProgress(
-						`동영상 다운로드 중 (${i + 1}/${videoUrlList.length})`,
-						percent,
-					);
-				}
-			},
-		);
-		downloadResults.push(result);
-	}
+	// 각 다운로드의 진행률을 추적하기 위한 맵
+	const progressMap = new Map<number, number>();
+	let completedCount = 0;
 
-	const successfulDownloads = downloadResults.filter((res) => res.success);
+	// 동시에 다운로드할 개수 (3-5개가 적절)
+	const concurrencyLimit = Math.min(5, videoUrlList.length);
+
+	// 각 다운로드 작업 생성
+	const downloadTasks = videoUrlList.map((url, index) => {
+		return async () => {
+			if (signal?.aborted) {
+				return { success: false, file: `video_${index + 1}.mp4` };
+			}
+
+			progressMap.set(index, 0);
+
+			const result = await downloadVideo(
+				url,
+				index,
+				downloadsDir,
+				signal,
+				(percent) => {
+					// 개별 다운로드 진행률 업데이트
+					progressMap.set(index, percent);
+
+					// 전체 진행률 계산
+					if (onProgress) {
+						const totalProgress =
+							(Array.from(progressMap.values()).reduce(
+								(sum, p) => sum + p,
+								0,
+							) /
+								videoUrlList.length) *
+							100;
+
+						completedCount = progressMap.size;
+						onProgress(
+							`동영상 다운로드 중 (${completedCount}/${videoUrlList.length})`,
+							Math.min(totalProgress, 100),
+						);
+					}
+				},
+			);
+
+			// 다운로드 완료 시 진행률을 100%로 설정
+			progressMap.set(index, 100);
+			completedCount++;
+
+			if (onProgress) {
+				const totalProgress =
+					(Array.from(progressMap.values()).reduce(
+						(sum, p) => sum + p,
+						0,
+					) /
+						videoUrlList.length) *
+					100;
+				onProgress(
+					`동영상 다운로드 중 (${completedCount}/${videoUrlList.length})`,
+					Math.min(totalProgress, 100),
+				);
+			}
+
+			return result;
+		};
+	});
+
+	// 병렬 다운로드 실행 (동시 실행 개수 제한)
+	const downloadResults = await limitConcurrency(
+		downloadTasks,
+		concurrencyLimit,
+	);
+
+	const successfulDownloads = downloadResults.filter(
+		(res): res is { success: true; path: string; file: string } =>
+			res.success && 'path' in res && res.path !== undefined,
+	);
 
 	console.log(
 		`\n다운로드 완료: 총 ${downloadResults.length}개 중 ${successfulDownloads.length}개 성공\n`,
@@ -246,38 +319,85 @@ export const downloadVideos = async (
 	}
 
 	// --- 2단계: 다운로드된 MP4 파일들을 MP3로 변환 ---
-	console.log('--- 2단계: MP3 변환 시작 ---');
+	console.log('--- 2단계: MP3 변환 시작 (병렬 처리) ---');
 	if (!fs.existsSync(convertedDir))
 		fs.mkdirSync(convertedDir, { recursive: true });
 
-	// 변환은 서버에 부하를 줄 수 있으므로 순차적으로 진행
-	for (let i = 0; i < successfulDownloads.length; i++) {
-		if (signal?.aborted) break;
-		const download = successfulDownloads[i];
-		if (onProgress) {
-			onProgress(
-				`MP3 변환 중 (${i + 1}/${successfulDownloads.length})`,
-				0,
-			);
-		}
-		try {
-			await convertToMp3(
-				download.path,
-				convertedDir,
-				signal,
-				(percent) => {
-					if (onProgress) {
-						onProgress(
-							`MP3 변환 중 (${i + 1}/${successfulDownloads.length})`,
-							percent,
-						);
-					}
-				},
-			);
-		} catch (e) {
-			if (signal?.aborted) break;
-		}
-	}
+	// 각 변환의 진행률을 추적하기 위한 맵
+	const conversionProgressMap = new Map<number, number>();
+	let conversionCompletedCount = 0;
+
+	// FFmpeg 변환은 CPU 집약적이므로 동시 실행 개수를 적게 설정 (2-3개)
+	const conversionConcurrencyLimit = Math.min(3, successfulDownloads.length);
+
+	// 각 변환 작업 생성
+	const conversionTasks = successfulDownloads.map((download, index) => {
+		return async () => {
+			if (signal?.aborted) {
+				return { success: false };
+			}
+
+			conversionProgressMap.set(index, 0);
+
+			try {
+				await convertToMp3(
+					download.path,
+					convertedDir,
+					signal,
+					(percent) => {
+						// 개별 변환 진행률 업데이트
+						conversionProgressMap.set(index, percent);
+
+						// 전체 진행률 계산
+						if (onProgress) {
+							const totalProgress =
+								(Array.from(
+									conversionProgressMap.values(),
+								).reduce((sum, p) => sum + p, 0) /
+									successfulDownloads.length) *
+								100;
+
+							conversionCompletedCount =
+								conversionProgressMap.size;
+							onProgress(
+								`MP3 변환 중 (${conversionCompletedCount}/${successfulDownloads.length})`,
+								Math.min(totalProgress, 100),
+							);
+						}
+					},
+				);
+
+				// 변환 완료 시 진행률을 100%로 설정
+				conversionProgressMap.set(index, 100);
+				conversionCompletedCount++;
+
+				if (onProgress) {
+					const totalProgress =
+						(Array.from(conversionProgressMap.values()).reduce(
+							(sum, p) => sum + p,
+							0,
+						) /
+							successfulDownloads.length) *
+						100;
+					onProgress(
+						`MP3 변환 중 (${conversionCompletedCount}/${successfulDownloads.length})`,
+						Math.min(totalProgress, 100),
+					);
+				}
+
+				return { success: true };
+			} catch (e) {
+				if (signal?.aborted) {
+					return { success: false };
+				}
+				console.error(`[변환 오류] ${download.file}:`, e);
+				return { success: false };
+			}
+		};
+	});
+
+	// 병렬 변환 실행 (동시 실행 개수 제한)
+	await limitConcurrency(conversionTasks, conversionConcurrencyLimit);
 
 	console.log('\n모든 작업이 완료되었습니다.');
 };
