@@ -6,12 +6,18 @@
 
 <img width="798" height="599" alt="Image" src="https://github.com/user-attachments/assets/4e5332c1-e033-45ad-a590-81d656265c2a" />
 
-
 ## ✨ 주요 기능
 
 - 📚 수강 중인 강의 목록 조회
 - 📥 온라인 강의 동영상 일괄 다운로드
 - 🎵 MP4 동영상을 MP3 오디오 파일로 자동 변환
+
+## 📦 다운로드
+
+빌드된 앱을 바로 사용하고 싶으시다면, [GitHub Releases](https://github.com/daunload/lecture-downloader/releases)에서 최신 버전을 다운로드할 수 있습니다.
+
+- 🍎 **macOS**: `.dmg` 파일 다운로드
+- 🪟 **Windows**: `.exe` 또는 `.zip` 파일 다운로드
 
 ## 🚀 실행 방법
 
