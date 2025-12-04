@@ -19,6 +19,18 @@
 - 🍎 **macOS**: `.dmg` 파일 다운로드
 - 🪟 **Windows**: `.exe` 또는 `.zip` 파일 다운로드
 
+<img width="263" height="253" alt="Image" src="https://github.com/user-attachments/assets/21347468-0334-4ce9-9591-74bcb539f7d8" />
+
+위와 같이 경고가 뜬 경우 
+
+```bash
+xattr -cr /Applications/online-class-downloader.app
+```
+
+
+
+
+
 ## 🚀 실행 방법
 
 ### 1. 사전 요구사항
