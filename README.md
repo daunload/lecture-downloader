@@ -4,6 +4,9 @@
 
 <img width="798" height="599" alt="Image" src="https://github.com/user-attachments/assets/af973281-c3a5-4977-94b9-7be4abbfdf30" />
 
+<img width="798" height="599" alt="Image" src="https://github.com/user-attachments/assets/4e5332c1-e033-45ad-a590-81d656265c2a" />
+
+
 ## ✨ 주요 기능
 
 - 📚 수강 중인 강의 목록 조회
