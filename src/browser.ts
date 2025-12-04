@@ -1,7 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'node:fs';
 import path from 'node:path';
-import puppeteer, { Page } from 'puppeteer';
+import { Page, launch } from 'puppeteer-core';
 
 /** 로그인 */
 const loginAndNavigate = async (page: Page, id: string, pw: string) => {
@@ -283,7 +283,11 @@ export const downloadVideos = async (
 };
 
 export const getOnlineClassList = async (id: string, pw: string) => {
-	const browser = await puppeteer.launch({ headless: true });
+	const browser = await launch({
+		headless: true,
+		channel: 'chrome',
+		args: ['--no-sandbox', '--disable-setuid-sandbox'],
+	});
 	const page = await browser.newPage();
 
 	await loginAndNavigate(page, id, pw);
@@ -297,7 +301,11 @@ export const getClassContents = async (
 	pw: string,
 	subjectName: string,
 ) => {
-	const browser = await puppeteer.launch({ headless: true });
+	const browser = await launch({
+		headless: true,
+		channel: 'chrome',
+		args: ['--no-sandbox', '--disable-setuid-sandbox'],
+	});
 	const page = await browser.newPage();
 
 	await loginAndNavigate(page, id, pw);
