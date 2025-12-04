@@ -3,6 +3,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Page, launch } from 'puppeteer-core';
 
+// ffmpeg 경로 설정 (런타임에 동적으로 로드하여 Vite 번들링 문제 회피)
+try {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
+	ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+	ffmpeg.setFfprobePath(ffprobeInstaller.path);
+} catch (error) {
+	console.warn('ffmpeg 경로를 찾을 수 없습니다:', error);
+}
+
 /** 로그인 */
 const loginAndNavigate = async (page: Page, id: string, pw: string) => {
 	await page.goto('https://klas.kw.ac.kr');

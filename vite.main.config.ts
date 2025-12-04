@@ -4,7 +4,12 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	build: {
 		rollupOptions: {
-			external: ['bufferutil', 'utf-8-validate'],
+			external: [
+				'bufferutil',
+				'utf-8-validate',
+				'@ffmpeg-installer/ffmpeg',
+				'@ffprobe-installer/ffprobe',
+			],
 		},
 	},
 });

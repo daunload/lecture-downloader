@@ -1,8 +1,21 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
+import fluent from 'fluent-ffmpeg';
 import path from 'node:path';
 import { updateElectronApp, UpdateSourceType } from 'update-electron-app';
 import BridgeHandler from './bridge';
+
+// ffmpeg 경로 설정 (런타임에 동적으로 로드하여 Vite 번들링 문제 회피)
+try {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ffmpeg = require('@ffmpeg-installer/ffmpeg');
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ffprobe = require('@ffprobe-installer/ffprobe');
+	fluent.setFfmpegPath(ffmpeg.path);
+	fluent.setFfprobePath(ffprobe.path);
+} catch (error) {
+	console.warn('ffmpeg 경로를 찾을 수 없습니다:', error);
+}
 
 updateElectronApp({
 	updateSource: {
