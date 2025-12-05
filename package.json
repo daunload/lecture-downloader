@@ -15,6 +15,15 @@
 		"dist:mac": "npm run package && electron-builder --mac",
 		"dist:win": "npm run package && electron-builder --win"
 	},
+	"build": {
+		"appId": "com.daunload.online-class-downloader",
+		"productName": "online-class-downloader",
+		"asar": true,
+		"asarUnpack": [
+			"node_modules/@ffmpeg-installer/**",
+			"node_modules/@ffprobe-installer/**"
+		]
+	},
 	"keywords": [],
 	"author": {
 		"name": "daunload",

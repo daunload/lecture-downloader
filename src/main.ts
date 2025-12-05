@@ -1,21 +1,25 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
-import fluent from 'fluent-ffmpeg';
 import path from 'node:path';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import ffmpeg from 'fluent-ffmpeg';
 import { updateElectronApp, UpdateSourceType } from 'update-electron-app';
 import BridgeHandler from './bridge';
 
-// ffmpeg 경로 설정 (런타임에 동적으로 로드하여 Vite 번들링 문제 회피)
-try {
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const ffmpeg = require('@ffmpeg-installer/ffmpeg');
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const ffprobe = require('@ffprobe-installer/ffprobe');
-	fluent.setFfmpegPath(ffmpeg.path);
-	fluent.setFfprobePath(ffprobe.path);
-} catch (error) {
-	console.warn('ffmpeg 경로를 찾을 수 없습니다:', error);
+// ffmpeg 경로 설정 (asar 내부에서 실행 불가하므로 unpacked 경로로 변경)
+let ffmpegPath = ffmpegInstaller.path;
+let ffprobePath = ffprobeInstaller.path;
+
+if (ffmpegPath.includes('app.asar')) {
+	ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
 }
+if (ffprobePath.includes('app.asar')) {
+	ffprobePath = ffprobePath.replace('app.asar', 'app.asar.unpacked');
+}
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
 
 updateElectronApp({
 	updateSource: {

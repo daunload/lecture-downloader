@@ -12,7 +12,9 @@ dotenv.config();
 
 const config: ForgeConfig = {
 	packagerConfig: {
-		asar: true,
+		asar: {
+			unpack: '{**/node_modules/@ffmpeg-installer/**/*,**/node_modules/@ffprobe-installer/**/*}',
+		},
 	},
 	rebuildConfig: {},
 	makers: [
