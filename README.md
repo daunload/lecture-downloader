@@ -1,5 +1,8 @@
 # 🎓 온라인 강의 다운로더
 
+버그 제보 부탁드려요! (daun4799@gmail.com)
+
+
 온라인 강의 동영상을 다운로드하고 MP3 오디오 파일로 변환하는 Electron 기반 데스크톱 애플리케이션입니다.
 
 <img width="798" height="599" alt="Image" src="https://github.com/user-attachments/assets/af973281-c3a5-4977-94b9-7be4abbfdf30" />
